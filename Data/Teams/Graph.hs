@@ -139,29 +139,19 @@ mkTeamTime' rest = mkTeamTime [] rest (const [])
 mkBelief :: Team -> G.Node -> [G.Node] -> [G.Node] -> Team
 mkBelief team idx from to 
     | isControl currentLabel
-                = G.insEdges insEdges . G.insNodes insNodes . 
-                  G.delEdges delEdges $ team 
+                = G.insEdges insEdges . G.insNodes insNodes $ team
     | otherwise = error $ "mkBelief called on a non Control node: " ++ 
                   name currentLabel
   where
-  currentLabel = trace (show (showLabels team [idx], showLabels team to,showLabels team from)) label team idx
+  currentLabel = label team idx
   beliefLabel  = printf "P(%s.|.%s)" (names' to) (names' from)
   names'       = showLabels team
-  [idx1, idx2] = G.newNodes 2 team
-  delEdges     = [] 
-                 -- G.edges team `intersect` 
-                 -- [ (a, b) | a <- from, b <- futureNodes team isControl idx ]
-                 -- ++ [ (a,idx) | a <- from, independent' a ] 
-                 -- only if from _|_ futureReward idx || (to, child idx)  
-  independent' = independent team (to ++ children team idx)
-                 (futureNodes team isReward idx) 
-  insNodes     = [(idx1, BeliefNode beliefLabel), (idx2, BeliefFactor "F")]
-  insEdges     = (idx2, idx1, Dependency) : (idx1, idx, Dependency) :
-                 [ (a, idx2, Dependency) | a <- from ] ++ 
-                 [ (a, idx1, BeliefEdge) | a <- from ] ++ 
-                 [ (idx1, a, BeliefEdge) | a <- to   ] 
-                 -- [ (a, idx2, Dependency) | a <- beliefGrandParents team idx ]
-
+  [idxV, idxF] = G.newNodes 2 team
+  insNodes     = [(idxV, BeliefNode beliefLabel), (idxF, BeliefFactor "F")]
+  insEdges     = (idxF, idxV, Dependency) : (idxV, idx, Dependency) :
+                 [ (a, idxF, Dependency) | a <- from ] ++ 
+                 [ (a, idxV, BeliefEdge) | a <- from ] ++ 
+                 [ (idxV, a, BeliefEdge) | a <- to   ] 
 
 -- * Graph information
 
@@ -244,6 +234,13 @@ knownParents team idx | null future = pa idx
         where pa      = parents team 
               future  = map pa . futureNodes team isControl $ idx
 
+-- | find parents that are known the all future controllers
+commonParents :: Team -> G.Node -> [G.Node]
+commonParents team idx | null future = pa idx
+                       | otherwise   = foldr intersect (pa idx) future
+        where pa      = parents team 
+              future  = map pa . futureNodes team isControl $ idx
+
 -- | find the moral of a graph (by marrying all parents)
 moral :: Team -> Team
 moral team = G.insEdges insEdges team where
@@ -272,11 +269,11 @@ irrelevant team idx = G.delEdges edges team where
                              (futureNodes team isReward idx)
 
 -- | add a belief node to a control node
-addBelief :: Team -> G.Node -> Team
-addBelief team idx | null to   = team
-                   | null from = team
-                   | otherwise = mkBelief team idx from to 
-  where from = knownParents team idx
+addBelief :: (Team -> G.Node -> [G.Node]) -> Team -> G.Node -> Team
+addBelief f team idx | null to   = team
+                     | null from = team
+                     | otherwise = mkBelief team idx from to 
+  where from = f team idx
         to   = state team idx \\ from
 
 -- | 
@@ -307,12 +304,21 @@ simplify team = foldr (flip irrelevant) team controls where
   controls = filterNodes isControl team (G.nodes team)
 
 -- | Add belief nodes to each control
-modify :: Team -> Team
-modify = beliefModify rmKnownEdges . beliefModify addBelief
-
 beliefModify :: (Team -> G.Node -> Team) -> Team -> Team
 beliefModify f team = foldl' f team controls where
   controls = filterNodes isControl team (G.nodes team)
+
+modify :: Team -> Team
+modify = modify1
+
+-- | Use known parents
+modify1 :: Team -> Team
+modify1 = beliefModify rmKnownEdges . beliefModify (addBelief knownParents)
+
+-- | Use common parents
+modify2 :: Team -> Team
+modify2 = beliefModify rmKnownEdges . beliefModify (addBelief commonParents)
+
 
 -- * Boolean checks for nodes 
 
