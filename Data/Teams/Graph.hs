@@ -1,401 +1,247 @@
--- (c) Aditya Mahajan
--- | Factor graph representation of sequential teams
+-- (c) Aditya Mahajan <aditya.mahajan@yale.edu>
+-- | Directed factor graph representation of sequential teams
 module Data.Teams.Graph where
 
 import qualified Data.Graph.Inductive as G
+import qualified Data.GraphViz  as G
 import qualified Data.Map as M (fromList)
-import Data.Map ((!), Map)
+import Data.Map ((!))
 import Data.Maybe (fromJust, catMaybes)
-import Data.List (nub, intersect, union, (\\), 
+import Data.List (nub, intersect, union, (\\),
                   delete, intercalate, inits, foldl')
-import Data.Traversable (traverse)
-import Control.Applicative (liftA2)
-import Control.Arrow ( (&&&) )
-import Control.Monad (liftM2)
 import Text.Printf (printf)
-import Debug.Trace (trace)
 
-{-
-Types of Nodes:
----------------
+-- | Time
+type Time = Int
 
-1. Factor Nodes
-   * Dynamic Nodes
-   * Control Nodes
+-- | Variable nodes
+data Variable = Reward      String
+              | NonReward   String
+               deriving (Eq, Ord, Show)
 
-2. Variable Nodes
-   * Reward Nodes
-   * Normal Nodes
+-- | Factor Vertexs
+data Factor   = Dynamics    String
+              | Control     String
+                deriving (Eq, Ord, Show)
 
-3. Belief Nodes
-   Probability belief of a set of variable nodes on another set of
-   variable  nodes
+-- | Create a sequence of nodes
+mkVertex ::  (String -> a) -> String -> Time -> a
+mkVertex t s = t . (s ++ ) . show
 
-Types of Edges:
----------------
+-- | Create a sequence of nodes of a specific type
+mkReward ::  String -> Time -> Variable
+mkReward    = mkVertex Reward 
 
-1. Dependency Edges
-   Indicate if a variable node depends on a factor node or indicates if a 
-   factor node depdends on a variable node.
+mkNonReward ::  String -> Time -> Variable
+mkNonReward = mkVertex NonReward
 
-2. Belief Edges
-   Indicates whether a belief node places belief on a variable node or if a
-   belief node is conditioned on a variable node.
+mkDynamics ::  String -> Time -> Factor
+mkDynamics  = mkVertex Dynamics
 
-3. Temporal Edges
-   To indicate a total order. This will be implemented when we are interested in
-   a sequential decomposition.
+mkControl ::  String -> Time -> Factor
+mkControl   = mkVertex Control
+
+-- | A generic node of a graph
+type Node = Either Factor Variable
+
+-- | A type class for defining operations on all nodes
+class Vertex a where
+  name        ::  a  -> String
+  names       :: [a] -> String
+  isReward    ::  a  -> Bool
+  isNonReward ::  a  -> Bool
+  isVariable  ::  a  -> Bool
+  isDynamics  ::  a  -> Bool
+  isControl   ::  a  -> Bool
+  isFactor    ::  a  -> Bool
+  attribute   ::  a  -> [G.Attribute]
+  -- Default implmentation
+  names xs     = "[" ++ intercalate ", " (map name xs) ++ "]"
+  isVariable   = or . sequence [isReward, isNonReward]
+  isFactor     = or . sequence [isControl, isDynamics]
+
+
+instance Vertex Variable where
+  name (Reward    a) = a
+  name (NonReward a) = a
   
--}
+  isReward    (Reward    _) = True
+  isReward    (NonReward _) = False
 
--- | Nodes:
-data Node      = Dynamics   String | Control      String      
-               | Normal     String | Reward       String      
-               | BeliefNode String | BeliefFactor String
-                                           deriving (Eq, Ord, Show)
+  isNonReward (Reward    _) = False
+  isNonReward (NonReward _) = True
 
--- | Edges:
-type Edge      = (Node, Node, EdgeType)           
-data EdgeType  = Dependency | BeliefEdge   deriving (Eq, Show)
+  isDynamics  _   = False
+  isControl   _   = False
 
--- | Graph:
-type Team      = G.Gr Node EdgeType
-type GraphNode = (G.Node, Node)
+  attribute (Reward    a) = [G.Style G.Filled, G.FillColor (G.RGB 0 255 0)
+                            , G.Shape G.Circle
+                            , G.Label a]
+  attribute (NonReward a) = [G.Shape G.Circle
+                            , G.Label a]
 
-{-
-I wanted a DSL interface for specifying the team problem. Normally,
-system dynamics look like
+instance Vertex Factor where
+  name (Dynamics a) = a
+  name (Control  a) = a
 
-    f( X | Y,Z )
-    g( X | Y,Z )
+  isDynamics (Dynamics _) = True
+  isDynamics (Control  _) = False
 
-Haskell does not provide operator overloading, so we specify the above system as
+  isControl  (Dynamics _) = False
+  isControl  (Control  _) = True
 
-   f .$. ( X .|. [Y,Z] )
-   ++ g .$. ( X .|. [Y,Z] )
+  isReward    _ = False
+  isNonReward _ = False
 
-This is a compromise between the natural way to specify the dynamics, and having
-to specify all nodes and edges manually. 
+  attribute (Dynamics a) = [G.Shape G.Rectangle
+                           , G.Label a]
+  attribute (Control  a) = [G.Style G.Filled, G.FillColor (G.RGB 255 0 0)
+                           , G.Shape G.Rectangle
+                           , G.Label a]
 
--}
+instance (Vertex a, Vertex b) => Vertex (Either a b) where
+  name        = either name        name
+  isReward    = either isReward    isReward
+  isNonReward = either isNonReward isNonReward
+  isDynamics  = either isDynamics  isDynamics 
+  isControl   = either isControl   isControl
+  attribute   = either attribute   attribute
 
-(.$.) :: Node -> (Node, [Node]) -> [(Node, Node)]
-(.$.) f (x,ys) = (f,x) : map (\y -> (y,f)) ys
+-- | An edge in a graph
+type Edge     = (Node, Node)
 
-(.|.) :: Node -> [Node] -> (Node, [Node])
+data EdgeType = Influence | Belief deriving (Eq, Ord, Show)
+
+edgeAttribute :: EdgeType -> [G.Attribute]
+edgeAttribute _ = []
+
+-- | Infix operators for ease of constructing a graph
+
+(.$.) ::  Factor -> (Variable, [Variable]) -> [Edge]
+(.$.) f (x,ys) = (Left f, Right x) : map (\y -> (Right y, Left f)) ys
+
+(.|.) ::  Variable -> [Variable] -> (Variable, [Variable])
 (.|.) x ys = (x,ys)
 
--- The operator (++) has infixr 5. We set infix of (.|.) and (.$.) so that we
--- do not need to specify extra brackets.
+(.=.) :: Variable -> Factor -> [Variable] -> [Edge]
+(.=.) u g ys = (.$.) g (u,ys)
+
 infixr 4 .|.
 infixr 6 .$.
+infixr 6 .=.
 
--- | Create a team problem
-mkTeam :: [(Node, Node)] -> Team
-mkTeam xs = G.mkGraph nodes edges where
-  assoc = flip zip [1..] . nub . concatMap (\(a,b) -> [a,b]) $ xs
-  nodes = map (\(a,b) -> (b,a)) assoc
-  m     = M.fromList assoc
-  edges = map ( \(a,b) -> (m!a, m!b, Dependency) ) xs
+-- | A sequential team as a directed acyclic factor graph (DAFG)
+type Team = G.Gr Node EdgeType
 
+-- | A utility function for creating a DAFG
+mkTeam :: [Edge] -> Team
+mkTeam es = G.mkGraph nodes edges where
+  {- 
+     mkGraph wants the nodes to be specified using an index. 
+     So we first create an index for all nodes
+  -}
+  nodes = zip [1..] . nub . concatMap (\(a,b) -> [a,b]) $ es
+  {-
+    Now we need to associate the node index with each edge.
+    Rather than searching the index over a list, we use a Map.
+  -}
+  m     = M.fromList . map swap $ nodes
+  edges = map (\ (a, b) -> (m!a, m!b, Influence) ) es
+
+-- | To make a time homogeneous system
+mkTeamTime :: (Time -> [Edge]) -> Time -> Team
+mkTeamTime dyn = mkTeamTimeBy [] dyn (const [])
+
+-- As an example, lets consider creating a MDP.
+-- (Also available in Data.Teams.Graph.Examples.MDP
 
 {-
-Using the above syntax, the variables have to defined as
+x = mkNonReward "x"
+u = mkNonReward "u"
+r = mkReward    "r"
 
-  x1 = NonReward "X1"
-  x2 = NonReward "X2"
-  x3 = NonReward "X3"
+f = mkDynamics  "f"
+g = mkControl   "g"
+d = mkDynamics  "d"
 
-We need to define one variable for each time instant. To make it simpler, we provide the following interface:
+dynamics t =  f(t-1).$.( x(t) .|. if t == 1 then [] else [x(t-1)] )
+          ++  g(t)  .$.( u(t) .|. map x[1..t] ++ map u[1..t-1]    )
+          ++  d(t)  .$.( r(t) .|. [ x(t), u(t) ]                  )
 
-  x = mkNode NonReward "X"
-
-and then use `x 1` instead of `x1`, etc.
+mdp = mkTeamTime dynamics 3
 -}
+    
+-- | To make a time homogeneous system with specific start and stop dynamics
+mkTeamTimeBy :: [Edge] -> (Time -> [Edge]) -> (Time -> [Edge]) -> Time -> Team
+mkTeamTimeBy start dyn stop horizon = mkTeam nodes where
+  nodes = start ++ concatMap dyn [1..horizon] ++ stop horizon
 
-mkNode :: (String -> Node) -> String -> Int -> Node
-mkNode n s = n . (s++) . show
+-- As an example, lets consider creating a communication problem with feedback
+-- (Also available in Data.Teams.Graph.Examples.CommFeedback)
 
 {-
-We also provide a means to specify time homogenous teams for arbitrary time.
-Some team problems, most notably communication problems, behave differently for
-the first and last time instance. If these are not needed, use mkTeamTime'
+m     = NonReward "m"
+mhat  = NonReward "mhat"
+r     = Reward    "r"
+h     = Dynamics  "h"
+g     = Control   "g"
+d     = Dynamics  "d"
+
+x = mkNonReward "x"
+y = mkNonReward "y"
+
+f = mkControl  "f"
+c = mkDynamics "c"
+
+start      = h .$.( m .|. [] )
+dynamics t = f(t) .$. ( x(t) .|. m : map x [1..t-1] ++ map y [1..t-1] )
+          ++ c(t) .$. ( y(t) .|. [ x(t) ] )
+stop t     = g .$. ( mhat .|. map y [1..t] )
+          ++ d .$. (r .|. [m, mhat] )
+
+commfb = mkTeamTimeBy start dynamics stop 3
 -}
 
-mkTeamTime :: [(Node, Node)]          -- First step
-           -> (Int -> [(Node, Node)]) -- Time homogeneous
-           -> (Int -> [(Node, Node)]) -- Last step
-           -> Int                     -- Horizon
-           -> Team
-mkTeamTime start rest end horizon = mkTeam allNodes where
-  allNodes = start ++ concatMap rest [1..horizon] ++ end horizon
-
-mkTeamTime':: (Int -> [(Node, Node)]) -- Time homogeneous
-           -> Int                     -- Horizon
-           -> Team
-mkTeamTime' rest = mkTeamTime [] rest (const [])
-
--- | Add a belief node at a given control factor
-mkBelief :: Team -> G.Node -> [G.Node] -> [G.Node] -> Team
-mkBelief team idx from to 
-    | isControl currentLabel
-                = G.insEdges insEdges . G.insNodes insNodes $ team
-    | otherwise = error $ "mkBelief called on a non Control node: " ++ 
-                  name currentLabel
-  where
-  currentLabel = label team idx
-  beliefLabel  = printf "P(%s.|.%s)" (names' to) (names' from)
-  names'       = showLabels team
-  [idxV, idxF] = G.newNodes 2 team
-  insNodes     = [(idxV, BeliefNode beliefLabel), (idxF, BeliefFactor "F")]
-  insEdges     = (idxF, idxV, Dependency) : (idxV, idx, Dependency) :
-                 [ (a, idxF, Dependency) | a <- from ] ++ 
-                 [ (a, idxV, BeliefEdge) | a <- from ] ++ 
-                 [ (idxV, a, BeliefEdge) | a <- to   ] 
-
--- * Graph information
-
--- | get label from node index
-label :: Team -> G.Node -> Node
-label team = fromJust . G.lab team
-
--- | filter nodes index and label of the team that whose label satisfies a 
--- | given predicate
-
-filterNodes ::  (Node -> Bool) -> Team -> [G.Node] -> [G.Node]
-filterNodes p team = filter (p . label team) 
-
--- | find the belief edges to a belief node
-beliefFrom :: Team -> G.Node -> [G.Node]
-beliefFrom team = map fst . filter isBeliefEdge . G.lpre team
-
--- | find the belief edges from a belief node
-beliefTo :: Team -> G.Node -> [G.Node]
-beliefTo team = map fst . filter isBeliefEdge . G.lsuc team
-
--- * Graph relations
-
--- | find indices of parents from the index of a node
-parents :: Team -> G.Node -> [G.Node]
-parents = G.pre 
-
--- | find indices of children from the index of a node
-children :: Team -> G.Node -> [G.Node]
-children = G.suc 
-
--- | find indices of descendants from the index of a node
-descendants :: Team -> G.Node -> [G.Node]
-descendants team idx = idx `delete` G.reachable idx team
-
--- | find indices of ancestors from the index of a node
-ancestors :: Team -> G.Node -> [G.Node]
-ancestors team idx = idx `delete` G.reachable idx (G.grev team)
-
--- | find the indices of the ancestoral set from the indices of a given set.
-ancestoral :: Team -> [G.Node] -> [G.Node]
-ancestoral team = nub . concatMap (flip G.reachable (G.grev team))
-
--- | find the indices of future nodes that satisfy a particular predicate
-futureNodes :: Team -> (Node -> Bool) -> G.Node -> [G.Node]
-futureNodes team p = filter (p . label team) . descendants team
-
--- | find the indices of past nodes that satisfy a particular predicate
-pastNodes :: Team -> (Node -> Bool) -> G.Node -> [G.Node]
-pastNodes team p = filter (p . label team) . ancestors team
-
--- | find the belief parents of a control node
-beliefParent :: Team -> G.Node -> Maybe G.Node
-beliefParent team idx = let 
-   idx' = filterNodes isBeliefNode team . parents team $ idx
-   in case idx' of
-      []  -> Nothing
-      [x] -> Just x
-      _   -> error $ "more than one belief Parent at node"
-                  ++ (show idx) ++ " parents " ++ (show idx')
-
--- | find the belief update of the belief node of a control node
-beliefUpdate :: Team ->  G.Node -> Maybe G.Node
-beliefUpdate team idx = do
-   bp <- beliefParent team $ idx 
-   let bu = filterNodes isBeliefFactor team . parents team $ bp 
-   return (head bu)
-
--- | find the immediate belief ancestors
-beliefGrandParents :: Team -> G.Node -> [G.Node]
-beliefGrandParents team idx = filter immediate beliefAncestors where
-  beliefAncestors  = filterNodes isBeliefNode team . ancestors team $ idx
-  immediate idxAnc = let d = descendants team idxAnc in
-                     null d || null (d `intersect` beliefAncestors)
-
--- | find parents that are known the some future controller
-knownParents :: Team -> G.Node -> [G.Node]
-knownParents team idx | null future = pa idx
-                      | otherwise   = pa idx `intersect` foldr1 union future
-        where pa      = parents team 
-              future  = map pa . futureNodes team isControl $ idx
-
--- | find parents that are known the all future controllers
-commonParents :: Team -> G.Node -> [G.Node]
-commonParents team idx | null future = pa idx
-                       | otherwise   = foldr intersect (pa idx) future
-        where pa      = parents team 
-              future  = map pa . futureNodes team isControl $ idx
-
--- | find the moral of a graph (by marrying all parents)
-moral :: Team -> Team
-moral team = G.insEdges insEdges team where
-  nodes    = G.nodes team
-  edges    = G.edges team
-  marry x  = let xs = parents team x in 
-             [(n1,n2) | n1 <- xs, n2 <- xs, n1 /= n2, notElem (n1,n2) edges] 
-  insEdges = map (\(a,b) -> (a,b,Dependency)) . concatMap marry $ nodes
-
--- * Indepdence
-
-independent :: Team -> [G.Node] -> [G.Node] -> G.Node -> Bool
-independent team conditioned reward idx = all different components where
-  different  = liftA2 (||) (notElem idx) (null . intersect reward)
-  -- different p = notElem idx p || null $ intersect reward p
-  components = G.components . G.delNodes (idx `delete` conditioned) . moral .
-               G.delNodes (G.nodes team \\ ancestoral team 
-                                          (conditioned ++ reward) ) $ team
-
--- | remove edges from irrelevant parents to a control node
-irrelevant :: Team -> G.Node -> Team
-irrelevant team idx = G.delEdges edges team where
-  edges        = map (\i -> (i,idx)) . filter independent'. 
-                 parents team $ idx
-  independent' = independent team (parents team idx ++ children team idx)
-                             (futureNodes team isReward idx)
-
--- | add a belief node to a control node
-addBelief :: (Team -> G.Node -> [G.Node]) -> Team -> G.Node -> Team
-addBelief f team idx | null to   = team
-                     | null from = team
-                     | otherwise = mkBelief team idx from to 
-  where from = f team idx
-        to   = state team idx \\ from
-
--- | 
-rmKnownEdges :: Team -> G.Node -> Team
-rmKnownEdges team idx = G.insEdges insEdges . G.delEdges delEdges $ team where
-  controls    = filterNodes isControl team (G.nodes team)
-  from       :: G.Node -> [G.Node]
-  from        = catMaybes . traverse (beliefFrom team) .  beliefParent team 
-  currentFrom = from idx
-  subset      = null . (\\) currentFrom . from
-  edges       = [ ((f,c), (f, fromJust $ beliefUpdate team c, Dependency)) 
-                | f <- currentFrom, c <- controls
-                , subset c ]
-  (delEdges, insEdges) = unzip edges
-
--- | find state sufficient for future rewards
-state :: Team -> G.Node -> [G.Node]
-state team idx = filter (not . independent') ancestors' where
-  ancestors'  :: [G.Node]
-  ancestors'   = pastNodes team isVariable idx
-  independent' = independent team ancestors' (futureNodes team isReward idx)
-
--- * Structural property
-
--- | Remove irrelevant edges from each control
-simplify :: Team -> Team
-simplify team = foldr (flip irrelevant) team controls where
-  controls = filterNodes isControl team (G.nodes team)
-
--- | Add belief nodes to each control
-beliefModify :: (Team -> G.Node -> Team) -> Team -> Team
-beliefModify f team = foldl' f team controls where
-  controls = filterNodes isControl team (G.nodes team)
-
-modify :: Team -> Team
-modify = modify1
-
--- | Use known parents
-modify1 :: Team -> Team
-modify1 = beliefModify rmKnownEdges . beliefModify (addBelief knownParents)
-
--- | Use common parents
-modify2 :: Team -> Team
-modify2 = beliefModify rmKnownEdges . beliefModify (addBelief commonParents)
-
-
--- * Boolean checks for nodes 
-
--- | check if a given node is a dynamics node
-isDynamics :: Node -> Bool
-isDynamics (Dynamics _) = True
-isDynamics _            = False
-
--- | check if a given node is a control node
-isControl :: Node -> Bool
-isControl (Control _) = True
-isControl _           = False
-
-isBeliefFactor :: Node -> Bool
-isBeliefFactor (BeliefFactor _) = True
-isBeliefFactor _                = False
-
-isBeliefNode :: Node -> Bool
-isBeliefNode (BeliefNode _) = True
-isBeliefNode _              = False
-
-isReward :: Node -> Bool
-isReward (Reward _) = True
-isReward _          = False
-
-isNormal :: Node -> Bool
-isNormal (Normal _) = True
-isNormal _          = False
-
-isVariable :: Node -> Bool
-isVariable n = any ($n) [isNormal, isReward, isBeliefNode]
-
--- * Boolean checks for edges :: Edge -> Bool
-
-isDependency :: (G.Node, EdgeType) -> Bool
-isDependency (_,Dependency) = True
-isDependency _              = False
-
-isBeliefEdge :: (G.Node, EdgeType) -> Bool
-isBeliefEdge (_,BeliefEdge) = True
-isBeliefEdge _              = False
-
--- * Show Team
+-- * Display functions
 
 printTeam :: Team -> IO ()
 printTeam = putStr . showTeam
 
 showTeam :: Team -> String
-showTeam team = showFunctions team isDynamics   "Dynamics:" ++ "\n"
-             ++ showFunctions team isControl    "Controls:" ++ "\n"
-             ++ showFunctions team isBeliefFactor "Belief:" ++ "\n"
+showTeam team = showTeamBy team isDynamics "Dynamics:" ++ "\n"
+             ++ showTeamBy team isControl  "Control :" ++ "\n"
 
-showFunctions :: Team -> (Node -> Bool) -> String -> String
-showFunctions team p str = if null eq then "" else unlines (header ++ eq)
-  where header = [str, map (const '=') str]
-        eq     = map showFactor . filterNodes p team $ (G.nodes team)
-        showFactor :: G.Node -> String
-        showFactor idx = printf "%s.$.(%s.|.%s)" (names' [idx])
-                               (names' (children team idx))
-                               (names' (parents  team idx))
-        names' = showLabels team
+showTeamBy :: Team -> (Node -> Bool) -> String -> String
+showTeamBy team p str = if null equations 
+                        then "" 
+                        else unlines (header ++ equations)
+  where header    = [str, map (const '=') str]
+        equations = map (showFactor) . filter (p.snd) . G.labNodes $ team
+        showFactor (idx,lab) = printf "%s.$.(%s.|.%s)" (name lab)
+                                  (labels team suc)
+                                  (labels team pre)
+            where suc = G.suc team idx
+                  pre = G.pre team idx
 
--- | get the labels of a collection of node indices
-showLabels ::  Team -> [G.Node] -> String
-showLabels team = names . map (label team)
 
--- | get the name of a node
-name :: Node -> String
-name (Dynamics     s) = s
-name (Control      s) = s
-name (Normal       s) = s
-name (Reward       s) = s
-name (BeliefNode   s) = s
-name (BeliefFactor s) = s
+-- * Convert to Graphviz graphs
 
--- | get names of a collection of nodes
-names :: [Node] -> String
-names [x] = name x
-names xs = "[" ++ intercalate ", " (map name xs) ++ "]"
+graphToDot :: Team -> G.DotGraph
+graphToDot team = G.graphToDot team [] (attribute.snd) 
+             (edgeAttribute. \(_,_,b) -> b)
 
+-- | Print the dot file
+printGraph ::  Team -> FilePath -> IO Bool
+printGraph team = G.runGraphviz (graphToDot team) G.Pdf 
+
+-- | Useful functions
+swap :: (a,b) -> (b,a)
+swap (a,b) = (b,a)
+
+-- | Extensions of Data.Graph.Inductive
+
+label ::  (Vertex a, G.Graph gr) => gr a b -> G.Node -> String
+label gr = name . fromJust . G.lab gr
+
+labels ::  (Vertex a, G.Graph gr) => gr a b -> [G.Node] -> String
+labels gr = names . map (fromJust . G.lab gr)
