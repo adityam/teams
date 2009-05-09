@@ -1,14 +1,25 @@
 -- (c) Aditya Mahajan <aditya.mahajan@yale.edu>
 -- | Directed factor graph representation of sequential teams
-module Data.Teams.Graph where
+module Data.Teams.Graph 
+  ( Time
+  , Variable (..) , Factor (..) , Node 
+  , mkVertex , mkReward , mkNonReward , mkDynamics , mkControl
+  , Vertex   (..)
+  , Edge , EdgeType (..)
+  , (.$.) , (.|.)
+  , Team , mkTeam , mkTeamTime , mkTeamTimeBy
+  , filterNodes, variables, rewards, factors, controls
+  , printTeam , showTeam , graphToDot , printGraph
+  , label, labels
+  , mdp
+  ) where
 
 import qualified Data.Graph.Inductive as G
 import qualified Data.GraphViz  as G
 import qualified Data.Map as M (fromList)
 import Data.Map ((!))
-import Data.Maybe (fromJust, catMaybes)
-import Data.List (nub, intersect, union, (\\),
-                  delete, intercalate, inits, foldl')
+import Data.Maybe (fromJust)
+import Data.List (nub, intercalate)
 import Text.Printf (printf)
 
 -- | Time
@@ -108,7 +119,7 @@ instance (Vertex a, Vertex b) => Vertex (Either a b) where
   attribute   = either attribute   attribute
 
 -- | An edge in a graph
-type Edge     = (Node, Node)
+type Edge     = (Node, Node, EdgeType)
 
 data EdgeType = Influence | Belief deriving (Eq, Ord, Show)
 
@@ -118,17 +129,14 @@ edgeAttribute _ = []
 -- | Infix operators for ease of constructing a graph
 
 (.$.) ::  Factor -> (Variable, [Variable]) -> [Edge]
-(.$.) f (x,ys) = (Left f, Right x) : map (\y -> (Right y, Left f)) ys
+(.$.) f (x,ys) = (Left f, Right x, Influence) 
+                : map (\y -> (Right y, Left f, Influence)) ys
 
 (.|.) ::  Variable -> [Variable] -> (Variable, [Variable])
 (.|.) x ys = (x,ys)
 
-(.=.) :: Variable -> Factor -> [Variable] -> [Edge]
-(.=.) u g ys = (.$.) g (u,ys)
-
 infixr 4 .|.
 infixr 6 .$.
-infixr 6 .=.
 
 -- | A sequential team as a directed acyclic factor graph (DAFG)
 type Team = G.Gr Node EdgeType
@@ -136,17 +144,8 @@ type Team = G.Gr Node EdgeType
 -- | A utility function for creating a DAFG
 mkTeam :: [Edge] -> Team
 mkTeam es = G.mkGraph nodes edges where
-  {- 
-     mkGraph wants the nodes to be specified using an index. 
-     So we first create an index for all nodes
-  -}
-  nodes = zip [1..] . nub . concatMap (\(a,b) -> [a,b]) $ es
-  {-
-    Now we need to associate the node index with each edge.
-    Rather than searching the index over a list, we use a Map.
-  -}
-  m     = M.fromList . map swap $ nodes
-  edges = map (\ (a, b) -> (m!a, m!b, Influence) ) es
+  (nodes,nodeMap) = G.mkNodes G.new . nub . concatMap (\(a,b,_) -> [a,b]) $ es
+  edges           = fromJust . G.mkEdges nodeMap $ es 
 
 -- | To make a time homogeneous system
 mkTeamTime :: (Time -> [Edge]) -> Time -> Team
@@ -155,7 +154,6 @@ mkTeamTime dyn = mkTeamTimeBy [] dyn (const [])
 -- As an example, lets consider creating a MDP.
 -- (Also available in Data.Teams.Graph.Examples.MDP
 
-{-
 x = mkNonReward "x"
 u = mkNonReward "u"
 r = mkReward    "r"
@@ -169,7 +167,6 @@ dynamics t =  f(t-1).$.( x(t) .|. if t == 1 then [] else [x(t-1)] )
           ++  d(t)  .$.( r(t) .|. [ x(t), u(t) ]                  )
 
 mdp = mkTeamTime dynamics 3
--}
     
 -- | To make a time homogeneous system with specific start and stop dynamics
 mkTeamTimeBy :: [Edge] -> (Time -> [Edge]) -> (Time -> [Edge]) -> Time -> Team
@@ -202,6 +199,29 @@ stop t     = g .$. ( mhat .|. map y [1..t] )
 commfb = mkTeamTimeBy start dynamics stop 3
 -}
 
+-- * Utility functions
+
+filterNodes :: (Node -> Bool) -> Team -> [G.Node] -> [G.Node]
+filterNodes p team = filter (p . label team) 
+
+selContext ::  Vertex a => (a -> Bool) -> G.Context a b -> Bool
+selContext p (_,idx,lab,_) = p lab
+
+selNodes :: (Node -> Bool) -> Team -> [G.Node]
+selNodes p = map G.node' . G.gsel (selContext p) 
+
+variables :: Team -> [G.Node]
+variables = selNodes isVariable
+
+rewards   ::  Team -> [G.Node]
+rewards   = selNodes isReward
+
+controls  ::  Team -> [G.Node] 
+controls  = selNodes isControl
+
+factors   ::  Team -> [G.Node]
+factors   = selNodes isFactor
+
 -- * Display functions
 
 printTeam :: Team -> IO ()
@@ -216,10 +236,10 @@ showTeamBy team p str = if null equations
                         then "" 
                         else unlines (header ++ equations)
   where header    = [str, map (const '=') str]
-        equations = map (showFactor) . filter (p.snd) . G.labNodes $ team
+        equations = map showFactor . filter (p.snd) . G.labNodes $ team
         showFactor (idx,lab) = printf "%s.$.(%s.|.%s)" (name lab)
-                                  (labels team suc)
-                                  (labels team pre)
+                                  (names.labels team $ suc)
+                                  (names.labels team $ pre)
             where suc = G.suc team idx
                   pre = G.pre team idx
 
@@ -240,8 +260,8 @@ swap (a,b) = (b,a)
 
 -- | Extensions of Data.Graph.Inductive
 
-label ::  (Vertex a, G.Graph gr) => gr a b -> G.Node -> String
-label gr = name . fromJust . G.lab gr
+label ::  G.Graph gr => gr a b -> G.Node -> a
+label gr = fromJust . G.lab gr
 
-labels ::  (Vertex a, G.Graph gr) => gr a b -> [G.Node] -> String
-labels gr = names . map (fromJust . G.lab gr)
+labels :: G.Graph gr => gr a b -> [G.Node] -> [a]
+labels = map . label 

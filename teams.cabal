@@ -8,9 +8,11 @@ Maintainer:          aditya.mahajan@yale.edu
 Build-Type:          Simple
 Cabal-Version:       >=1.2
 Category:            Algorithms, Stochastic Control
+Stability:           experimental
 Synopsis:            Find structural results for decentralized team problems
                      using graphical models
 Library
    Build-Depends:     base, fgl>=5.4, containers, graphviz>=2009.5.1
    Exposed-modules:   Data.Teams.Graph
+                      Data.Teams.Structure
    ghc-options:       -Wall
