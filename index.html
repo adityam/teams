@@ -88,6 +88,98 @@ $ runhaskell Setup install</pre></li>
     <h2>License</h2>
     <p>GNU General Public License v. 3.0</p>
 
+    <h2>Example</h2>
+    <p>
+    Lets try to derive the structural results for
+    the real-time source coding problem considered in
+    <blockquote>
+      Hans S. Witsenhausen, "On the structure of real-time source coders,"
+      <em>Bell Systems Technical Journal,</em> 
+      vol 58, no 6, pp 1437-1451, July-August 1979.
+      <blockquote></p>
+
+    <p>We use a <a
+      href="http://en.wikipedia.org/wiki/Domain-specific_programming_language">EDSL</a> to specify the system. </p>
+    <script src="http://gist.github.com/109146.js"></script>
+
+    <p> Load this file in <code>ghci</code> and run
+<pre>*Main&gt; printTeam rt
+Dynamics:
+=========
+f1.$.([x1].|.[])
+d1.$.([r1].|.[x1, x'1])
+f2.$.([x2].|.[x1])
+d2.$.([r2].|.[x2, x'2])
+f3.$.([x3].|.[x2])
+d3.$.([r3].|.[x3, x'3])
+f4.$.([x4].|.[x3])
+d4.$.([r4].|.[x'4, x4])
+
+Control :
+=========
+c1.$.([y1].|.[x1])
+g1.$.([x'1].|.[y1])
+l1.$.([m1].|.[y1])
+c2.$.([y2].|.[y1, x2, x1])
+g2.$.([x'2].|.[y2, m1])
+l2.$.([m2].|.[y2, m1])
+c3.$.([y3].|.[y2, y1, x3, x2, x1])
+g3.$.([x'3].|.[y3, m2])
+l3.$.([m3].|.[y3, m2])
+c4.$.([y4].|.[x4, y3, y2, y1, x3, x2, x1])
+g4.$.([x'4].|.[m3, y4])
+l4.$.([m4].|.[m3, y4]) </pre>
+
+    <p> A graph can be obtained by
+
+<pre>*Main&gt; printGraph rt "/tmp/rt.pdf" </pre>
+
+    which gives 
+    <a href="rt.png"><img src="rt.png" width="100px"/></a>
+    
+    </p>
+
+    <p> Now to simplify the sequential team
+<pre>*Main&gt; let rt' = simplify rt
+*Main&gt; printTeam rt'
+Simplify : Iteration 1
+Simplify : Iteration 2
+Simplify : Iteration 3
+Simplify : Iteration 4
+Dynamics:
+=========
+f1.$.([x1].|.[])
+d1.$.([r1].|.[x1, x'1])
+f2.$.([x2].|.[x1])
+d2.$.([r2].|.[x2, x'2])
+f3.$.([x3].|.[x2])
+d3.$.([r3].|.[x3, x'3])
+f4.$.([x4].|.[x3])
+d4.$.([r4].|.[x'4, x4])
+
+Control :
+=========
+c1.$.([y1].|.[x1])
+g1.$.([x'1].|.[y1])
+l1.$.([m1].|.[y1])
+c2.$.([y2].|.[m1, x2])
+g2.$.([x'2].|.[m1, y2])
+l2.$.([m2].|.[m1, y2])
+c3.$.([y3].|.[m2, x3])
+g3.$.([x'3].|.[m2, y3])
+l3.$.([m3].|.[m2, y3])
+c4.$.([y4].|.[m3, x4])
+g4.$.([x'4].|.[m3, y4])
+l4.$.([m4].|.[])</pre> </p>
+
+    Graphically, the simplified system is
+    <a href="rt_simplified.png"><img src="rt_simplified.png"
+      width="100px"/></a></p>
+
+    <p> The structural results are the same as those derived by Witsenhausen in
+    the above paper </p>
+
+      
     <div class="footer">
       get the source code on GitHub : <a href="http://github.com/adityam/teams">adityam/teams</a>
     </div>
