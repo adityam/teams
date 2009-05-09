@@ -1,5 +1,23 @@
 -- (c) Aditya Mahajan <aditya.mahajan@yale.edu>
 -- | Directed factor graph representation of sequential teams
+
+{-
+Description
+===========
+
+This module implements an automated algorithm to simplify sequential teams. A
+team is a multi-agent stochastic control problem in which all agents have a
+common objective. A team is sequential if and only if there is a partial order
+between all the system variables. These partial order relationship can be
+represented using a directed graph, in particular, using a directed factor
+graph. The variable nodes of the factor graph represent the system variables and
+the factor nodes represent the system dynamics and control functions. The
+structural results for these system are equivalent to simplification of the
+factor graph. An automated algorithm for graph simplification is presented in
+the <code>Data.Teams.Structure</code> module.
+
+-}
+
 module Data.Teams.Graph 
   ( Time
   , Variable (..) , Factor (..) , Node 
@@ -8,7 +26,7 @@ module Data.Teams.Graph
   , Edge , EdgeType (..)
   , (.$.) , (.|.)
   , Team , mkTeam , mkTeamTime , mkTeamTimeBy
-  , filterNodes, selNodes , variables, rewards, factors, controls
+  , selNodes , variables, rewards, factors, controls
   , parents , children , ancestors , ancestoral , descendants 
   , futureNodes , pastNodes
   , printTeam , showTeam , graphToDot , printGraph
@@ -120,8 +138,12 @@ instance (Vertex a, Vertex b) => Vertex (Either a b) where
 -- | An edge in a graph
 type Edge     = (Node, Node, EdgeType)
 
+-- | Currently all edges are Influence edges. Future versions will have
+--   belief edges.
 data EdgeType = Influence | Belief deriving (Eq, Ord, Show)
 
+-- | Since all edges are Influence edges, we do not differential between the
+--   edges
 edgeAttribute :: EdgeType -> [G.Attribute]
 edgeAttribute _ = []
 
@@ -150,8 +172,7 @@ mkTeam es = G.mkGraph nodes edges where
 mkTeamTime :: (Time -> [Edge]) -> Time -> Team
 mkTeamTime dyn = mkTeamTimeBy [] dyn (const [])
 
--- As an example, lets consider creating a MDP.
--- (Also available in Data.Teams.Graph.Examples.MDP
+-- As an example, an MDP can be created as follows
 
 {-
 x = mkNonReward "x"
@@ -174,8 +195,8 @@ mkTeamTimeBy :: [Edge] -> (Time -> [Edge]) -> (Time -> [Edge]) -> Time -> Team
 mkTeamTimeBy start dyn stop horizon = mkTeam nodes where
   nodes = start ++ concatMap dyn [1..horizon] ++ stop horizon
 
--- As an example, lets consider creating a communication problem with feedback
--- (Also available in Data.Teams.Graph.Examples.CommFeedback)
+-- As an example, a communication system with feedback can be created as
+-- follows.
 
 {-
 m     = NonReward "m"
@@ -202,8 +223,8 @@ commfb = mkTeamTimeBy start dynamics stop 3
 
 -- * Utility functions
 
-filterNodes :: (Node -> Bool) -> Team -> [G.Node] -> [G.Node]
-filterNodes p team = filter (p . label team) 
+-- filterNodes :: (Node -> Bool) -> Team -> [G.Node] -> [G.Node]
+-- filterNodes p team = filter (p . label team) 
 
 selNodes :: G.Graph gr => (a -> Bool) -> gr a b -> [G.Node]
 selNodes p = map G.node' . G.gsel (p.G.lab') 
