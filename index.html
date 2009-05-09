@@ -186,8 +186,8 @@ l4.$.([m4].|.[m3, y4]) </pre>
     </p>
 
     <p> Now to simplify the sequential team
-<pre>*Main&gt; let rt' = simplify rt
-*Main&gt; printTeam rt'
+<pre>*Main&gt; let rtSimplify = simplify rt
+*Main&gt; printTeam rtSimplify
 Simplify : Iteration 1
 Simplify : Iteration 2
 Simplify : Iteration 3
@@ -219,7 +219,7 @@ g4.$.([x'4].|.[m3, y4])
 l4.$.([m4].|.[])</pre> </p>
 
     <p>Graphically, the simplified system is</p>
-<pre>*Main&gt; printGraph rt "/tmp/rt.pdf" </pre>
+<pre>*Main&gt; printGraph rtSimplify "/tmp/rt_simplify.pdf" </pre>
 
     <a href="rt_simplified.png"><img src="rt_simplified.png"
       width="400px"/></a></p>
