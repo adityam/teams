@@ -29,6 +29,12 @@
 		pre { background: #000; color: #fff; padding: 15px;}
     hr { border: 0; width: 80%; border-bottom: 1px solid #aaa}
     .footer { text-align:center; padding-top:30px; font-style: italic; }
+    .hs-keyglyph, .hs-layout {color: red;}
+    .hs-keyword {color: blue;}
+    .hs-comment, .hs-comment a {color: green;}
+    .hs-str, .hs-chr {color: teal;}
+    .hs-keyword, .hs-conid, .hs-varid, .hs-conop, .hs-varop, .hs-num, .hs-cpp, .hs-sel, .hs-definition {}
+
 	</style>
 	
 </head>
@@ -100,7 +106,33 @@ $ runhaskell Setup install</pre></li>
 
     <p>We use a <a
       href="http://en.wikipedia.org/wiki/Domain-specific_programming_language">EDSL</a> to specify the system. </p>
-    <script src="http://gist.github.com/109146.js"></script>
+
+<pre>
+<span class='hs-definition'>x</span>  <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkNonReward</span> <span class='hs-str'>"x"</span>
+<span class='hs-definition'>x'</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkNonReward</span> <span class='hs-str'>"x'"</span>
+<span class='hs-definition'>y</span>  <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkNonReward</span> <span class='hs-str'>"y"</span>
+<span class='hs-definition'>m</span>  <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkNonReward</span> <span class='hs-str'>"m"</span>
+<span class='hs-definition'>r</span>  <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkReward</span>    <span class='hs-str'>"r"</span>
+
+<span class='hs-definition'>f</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkDynamics</span> <span class='hs-str'>"f"</span>
+<span class='hs-definition'>c</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkControl</span>  <span class='hs-str'>"c"</span>
+<span class='hs-definition'>g</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkControl</span>  <span class='hs-str'>"g"</span>
+<span class='hs-definition'>l</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkControl</span>  <span class='hs-str'>"l"</span>
+<span class='hs-definition'>d</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkDynamics</span> <span class='hs-str'>"d"</span>
+
+<span class='hs-definition'>dynamics</span> <span class='hs-varid'>t</span> <span class='hs-keyglyph'>|</span> <span class='hs-varid'>t</span> <span class='hs-varop'>==</span> <span class='hs-num'>1</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>f</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>x</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span> <span class='hs-varop'>.|.</span> <span class='hs-conid'>[]</span><span class='hs-layout'>)</span>
+                   <span class='hs-varop'>++</span> <span class='hs-varid'>c</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>y</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span> <span class='hs-varop'>.|.</span> <span class='hs-keyglyph'>[</span><span class='hs-varid'>x</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+                   <span class='hs-varop'>++</span> <span class='hs-varid'>g</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>x'</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-varop'>.|.</span> <span class='hs-keyglyph'>[</span><span class='hs-varid'>y</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+                   <span class='hs-varop'>++</span> <span class='hs-varid'>l</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>m</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span> <span class='hs-varop'>.|.</span> <span class='hs-keyglyph'>[</span><span class='hs-varid'>y</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+                   <span class='hs-varop'>++</span> <span class='hs-varid'>d</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>r</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span> <span class='hs-varop'>.|.</span> <span class='hs-keyglyph'>[</span><span class='hs-varid'>x</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-layout'>,</span> <span class='hs-varid'>x'</span><span class='hs-layout'>(</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+           <span class='hs-keyglyph'>|</span> <span class='hs-varid'>otherwise</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>f</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>x</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span> <span class='hs-varop'>.|.</span> <span class='hs-keyglyph'>[</span><span class='hs-varid'>x</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-comment'>-</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+                      <span class='hs-varop'>++</span> <span class='hs-varid'>c</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>y</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span> <span class='hs-varop'>.|.</span> <span class='hs-varid'>map</span> <span class='hs-varid'>x</span><span class='hs-keyglyph'>[</span><span class='hs-num'>1</span><span class='hs-keyglyph'>..</span><span class='hs-varid'>t</span><span class='hs-keyglyph'>]</span> <span class='hs-varop'>++</span> <span class='hs-varid'>map</span> <span class='hs-varid'>y</span><span class='hs-keyglyph'>[</span><span class='hs-num'>1</span><span class='hs-keyglyph'>..</span><span class='hs-varid'>t</span><span class='hs-comment'>-</span><span class='hs-num'>1</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+                      <span class='hs-varop'>++</span> <span class='hs-varid'>g</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>x'</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-varop'>.|.</span> <span class='hs-keyglyph'>[</span><span class='hs-varid'>y</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-layout'>,</span> <span class='hs-varid'>m</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-comment'>-</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+                      <span class='hs-varop'>++</span> <span class='hs-varid'>l</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>m</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span> <span class='hs-varop'>.|.</span> <span class='hs-keyglyph'>[</span><span class='hs-varid'>y</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-layout'>,</span> <span class='hs-varid'>m</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-comment'>-</span><span class='hs-num'>1</span><span class='hs-layout'>)</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+                      <span class='hs-varop'>++</span> <span class='hs-varid'>d</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-varop'>.$.</span><span class='hs-layout'>(</span><span class='hs-varid'>r</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span> <span class='hs-varop'>.|.</span> <span class='hs-keyglyph'>[</span><span class='hs-varid'>x</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-layout'>,</span> <span class='hs-varid'>x'</span><span class='hs-layout'>(</span><span class='hs-varid'>t</span><span class='hs-layout'>)</span><span class='hs-keyglyph'>]</span><span class='hs-layout'>)</span>
+
+<span class='hs-definition'>rt</span> <span class='hs-keyglyph'>=</span> <span class='hs-varid'>mkTeamTime</span> <span class='hs-varid'>dynamics</span> <span class='hs-num'>4</span></pre>
+
 
     <p> Load this file in <code>ghci</code> and run
 <pre>*Main&gt; printTeam rt
@@ -130,12 +162,14 @@ c4.$.([y4].|.[x4, y3, y2, y1, x3, x2, x1])
 g4.$.([x'4].|.[m3, y4])
 l4.$.([m4].|.[m3, y4]) </pre>
 
-    <p> A graph can be obtained by
+    <p> A graph can be obtained by</p>
 
 <pre>*Main&gt; printGraph rt "/tmp/rt.pdf" </pre>
 
-    which gives 
-    <a href="rt.png"><img src="rt.png" width="100px"/></a>
+    <p>which gives </p>
+
+
+    <a href="rt.png"><img src="rt.png" width="400px"/></a>
     
     </p>
 
@@ -172,9 +206,10 @@ c4.$.([y4].|.[m3, x4])
 g4.$.([x'4].|.[m3, y4])
 l4.$.([m4].|.[])</pre> </p>
 
-    Graphically, the simplified system is
+    <p>Graphically, the simplified system is</p>
+
     <a href="rt_simplified.png"><img src="rt_simplified.png"
-      width="100px"/></a></p>
+      width="400px"/></a></p>
 
     <p> The structural results are the same as those derived by Witsenhausen in
     the above paper </p>
