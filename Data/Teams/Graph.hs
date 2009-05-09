@@ -17,8 +17,6 @@ module Data.Teams.Graph
 
 import qualified Data.Graph.Inductive as G
 import qualified Data.GraphViz  as G
-import qualified Data.Map as M (fromList)
-import Data.Map ((!))
 import Data.Maybe (fromJust)
 import Data.List (nub, intercalate, delete)
 import Text.Printf (printf)

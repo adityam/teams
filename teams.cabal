@@ -15,4 +15,6 @@ Library
    Build-Depends:     base, fgl>=5.4, containers, graphviz>=2009.5.1
    Exposed-modules:   Data.Teams.Graph
                       Data.Teams.Structure
+                      Data.Teams.Examples.Wit79
+                      Data.Teams.Examples.DecMdp
    ghc-options:       -Wall

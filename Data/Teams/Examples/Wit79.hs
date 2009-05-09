@@ -5,6 +5,8 @@
 --      Bell Systems Technical Journal, 
 --      vol 58, no 6, pp 1437-1451, July-August 1979
 
+module Data.Teams.Examples.Wit79 where
+
 import Data.Teams.Structure 
 
 x  = mkNonReward "x"
