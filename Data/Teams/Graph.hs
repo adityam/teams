@@ -8,10 +8,11 @@ module Data.Teams.Graph
   , Edge , EdgeType (..)
   , (.$.) , (.|.)
   , Team , mkTeam , mkTeamTime , mkTeamTimeBy
-  , filterNodes, variables, rewards, factors, controls
+  , filterNodes, selNodes , variables, rewards, factors, controls
+  , parents , children , ancestors , ancestoral , descendants 
+  , futureNodes , pastNodes
   , printTeam , showTeam , graphToDot , printGraph
   , label, labels
-  , mdp
   ) where
 
 import qualified Data.Graph.Inductive as G
@@ -19,7 +20,7 @@ import qualified Data.GraphViz  as G
 import qualified Data.Map as M (fromList)
 import Data.Map ((!))
 import Data.Maybe (fromJust)
-import Data.List (nub, intercalate)
+import Data.List (nub, intercalate, delete)
 import Text.Printf (printf)
 
 -- | Time
@@ -154,6 +155,7 @@ mkTeamTime dyn = mkTeamTimeBy [] dyn (const [])
 -- As an example, lets consider creating a MDP.
 -- (Also available in Data.Teams.Graph.Examples.MDP
 
+{-
 x = mkNonReward "x"
 u = mkNonReward "u"
 r = mkReward    "r"
@@ -162,11 +164,12 @@ f = mkDynamics  "f"
 g = mkControl   "g"
 d = mkDynamics  "d"
 
-dynamics t =  f(t-1).$.( x(t) .|. if t == 1 then [] else [x(t-1)] )
+dynamics t =  f(t-1).$.( x(t) .|. if t == 1 then [] else [x(t-1), u(t-1)] )
           ++  g(t)  .$.( u(t) .|. map x[1..t] ++ map u[1..t-1]    )
           ++  d(t)  .$.( r(t) .|. [ x(t), u(t) ]                  )
 
 mdp = mkTeamTime dynamics 3
+-}
     
 -- | To make a time homogeneous system with specific start and stop dynamics
 mkTeamTimeBy :: [Edge] -> (Time -> [Edge]) -> (Time -> [Edge]) -> Time -> Team
@@ -204,11 +207,8 @@ commfb = mkTeamTimeBy start dynamics stop 3
 filterNodes :: (Node -> Bool) -> Team -> [G.Node] -> [G.Node]
 filterNodes p team = filter (p . label team) 
 
-selContext ::  Vertex a => (a -> Bool) -> G.Context a b -> Bool
-selContext p (_,idx,lab,_) = p lab
-
-selNodes :: (Node -> Bool) -> Team -> [G.Node]
-selNodes p = map G.node' . G.gsel (selContext p) 
+selNodes :: G.Graph gr => (a -> Bool) -> gr a b -> [G.Node]
+selNodes p = map G.node' . G.gsel (p.G.lab') 
 
 variables :: Team -> [G.Node]
 variables = selNodes isVariable
@@ -221,6 +221,37 @@ controls  = selNodes isControl
 
 factors   ::  Team -> [G.Node]
 factors   = selNodes isFactor
+
+-- * Graph relations
+
+-- | find indices of parents from the index of a node
+parents :: Team -> G.Node -> [G.Node]
+parents = G.pre 
+
+-- | find indices of children from the index of a node
+children :: Team -> G.Node -> [G.Node]
+children = G.suc 
+
+-- | find indices of descendants from the index of a node
+descendants :: Team -> G.Node -> [G.Node]
+descendants team idx = idx `delete` G.reachable idx team
+
+-- | find indices of ancestors from the index of a node
+ancestors :: Team -> G.Node -> [G.Node]
+ancestors team idx = idx `delete` G.reachable idx (G.grev team)
+
+-- | find the indices of the ancestoral set from the indices of a given set.
+ancestoral :: Team -> [G.Node] -> [G.Node]
+ancestoral team = nub . concatMap (flip G.reachable (G.grev team))
+
+-- | find the indices of future nodes that satisfy a particular predicate
+futureNodes :: Team -> (Node -> Bool) -> G.Node -> [G.Node]
+futureNodes team p = filter (p . label team) . descendants team
+
+-- | find the indices of past nodes that satisfy a particular predicate
+pastNodes :: Team -> (Node -> Bool) -> G.Node -> [G.Node]
+pastNodes team p = filter (p . label team) . ancestors team
+
 
 -- * Display functions
 
@@ -253,10 +284,6 @@ graphToDot team = G.graphToDot team [] (attribute.snd)
 -- | Print the dot file
 printGraph ::  Team -> FilePath -> IO Bool
 printGraph team = G.runGraphviz (graphToDot team) G.Pdf 
-
--- | Useful functions
-swap :: (a,b) -> (b,a)
-swap (a,b) = (b,a)
 
 -- | Extensions of Data.Graph.Inductive
 
