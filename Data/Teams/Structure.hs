@@ -273,10 +273,8 @@ result p team condition = map fst . filter (p.snd) . G.labNodes
 
 -- | Irrelevant nodes
 --   The nodes that have not been visited from their parents are irrelevant
---   (We are not marking factor nodes. If we did that, then we would also need
---   to check if a given node was a variable node or not)
 irrelevant ::  Team -> [G.Node] -> [G.Node] -> [G.Node]
-irrelevant = result (not.isTopMarked)
+irrelevant = result (and . sequence [not.isTopMarked, isVariable.node] )
 
 -- | Requisite observations
 --   The observation nodes are thouse nodes in the condition that are marked as
