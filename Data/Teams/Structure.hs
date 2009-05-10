@@ -11,12 +11,11 @@ algortihm to check conditional independence.
 
 -}
 
-module Data.Teams.Structure where
---   (
---     observations , irrelevant , determined , effective 
---   , simplifyAt , simplifyOnce , simplify
---   , module Data.Teams.Graph
---   ) where
+module Data.Teams.Structure 
+ ( observations , irrelevant , determined , effective 
+ , simplifyAt , simplifyOnce , simplify
+ , module Data.Teams.Graph
+ ) where
 
 import Data.Teams.Graph
 import qualified Data.Graph.Inductive as G
@@ -146,8 +145,8 @@ instance (Initializable a, Initializable b) => Initializable (Either a b) where
 type MTeam = G.Gr Marked EdgeType
 
 -- | All scheduled nodes
-scheduled :: MTeam -> [G.Node]
-scheduled = selNodes isScheduled
+scheduledNodes :: MTeam -> [G.Node]
+scheduledNodes = selNodes isScheduled
 
 -- | The Bayes Ball algorithm
 bayesBall :: Team -> [G.Node] -> [G.Node] -> MTeam
@@ -162,7 +161,7 @@ bayesBall team condition reward = doBayesBall condition mteam where
 
 -- | The main loop of the Bayes Ball algorithm
 doBayesBall :: [G.Node] -> MTeam -> MTeam
-doBayesBall condition gr = case scheduled gr of
+doBayesBall condition gr = case scheduledNodes gr of
   -- If there are no more scheduled nodes, then we are done.
   []    -> gr
   -- Otherwise we modify the graph and loop again
