@@ -1,16 +1,15 @@
-Name:                teams-structure
-Version:             0.0
-Description:         Package to identify structural results of sequential teams
+Name:                teams
+Version:             0.0.1
+Description:         Graphical modeling tools for sequential teams
 License:             GPL
 License-file:        LICENSE
 Author:              Aditya Mahajan
-Maintainer:          aditya.mahajan@yale.edu
+Maintainer:          aditya DOT mahajan AT yale DOT edu
 Build-Type:          Simple
 Cabal-Version:       >=1.2
 Category:            Algorithms, Stochastic Control
 Stability:           experimental
-Synopsis:            Find structural results for decentralized team problems
-                     using graphical models
+Synopsis:            Graphical modeling tools for sequential teams
 Library
    Build-Depends:     base, fgl>=5.4, containers, graphviz>=2009.5.1
    Exposed-modules:   Data.Teams.Graph
