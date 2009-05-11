@@ -1,20 +1,19 @@
 -- (c) Aditya Mahajan <aditya.mahajan@yale.edu>
--- | Structural results for sequential teams
-
-{- 
-Description
-===========
+{- |
 
 This module implments an automated algortihm to simplify sequential teams. The
-simplification is based on conditional independences. We use the Bayes Ball
-algortihm to check conditional independence.
+simplification is based on conditional independences. Conditional independence
+is checked using the Bayes Ball algorithm
+<http://citeseer.ist.psu.edu/old/399661.html>
 
 -}
 
 module Data.Teams.Structure 
- ( observations , irrelevant , determined , effective 
+ ( module Data.Teams.Graph
+ -- * Determine conditional independence
+ , observations , irrelevant , determined , effective 
+ -- * Structural results for teams
  , simplifyAt , simplifyOnce , simplify
- , module Data.Teams.Graph
  ) where
 
 import Data.Teams.Graph

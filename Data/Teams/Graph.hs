@@ -1,35 +1,49 @@
 -- (c) Aditya Mahajan <aditya.mahajan@yale.edu>
--- | Directed factor graph representation of sequential teams
+-- | This Haskell library implements the algorithm for simplifying sequential
+-- teams presented 
+--
+-- Aditya Mahajan and Sekhar Tatikonda, A graphical modeling approach to
+-- simplifying sequential teams, proceedings of 7th International Symposium on
+-- Modeling and Optimization in Mobile, Ad Hoc, and Wireless Networks (WiOpt),
+-- Control over Communication Channels (ConCom) Workshop, Seoul, South Korea,
+-- June 27, 2009.
+--
+-- The paper can be obtained from
+-- <http://pantheon.yale.edu/~am894/publications.html#concom-2009>. See
+-- <http://pantheon.yale.edu/~am894/code/teams/> for a usage example.
+--
+-- A team is a multi-agent stochastic control problem in which all agents have a
+-- common objective. A team is sequential if and only if there is a partial
+-- order between all the system variables. These partial order relationship can
+-- be represented using a directed graph, in particular, using a directed factor
+-- graph. The variable nodes of the factor graph represent the system variables
+-- and the factor nodes represent the system dynamics and control functions. The
+-- structural results for these system are equivalent to simplification of the
+-- factor graph. An automated algorithm for graph simplification is presented in
+-- the "Data.Teams.Structure" module.
 
-{-
-Description
-===========
-
-This module implements an automated algorithm to simplify sequential teams. A
-team is a multi-agent stochastic control problem in which all agents have a
-common objective. A team is sequential if and only if there is a partial order
-between all the system variables. These partial order relationship can be
-represented using a directed graph, in particular, using a directed factor
-graph. The variable nodes of the factor graph represent the system variables and
-the factor nodes represent the system dynamics and control functions. The
-structural results for these system are equivalent to simplification of the
-factor graph. An automated algorithm for graph simplification is presented in
-the <code>Data.Teams.Structure</code> module.
-
--}
 
 module Data.Teams.Graph 
-  ( Time
-  , Variable (..) , Factor (..) , Node 
-  , mkVertex , mkReward , mkNonReward , mkDynamics , mkControl
-  , Vertex   (..)
+  ( -- * Classes
+  Vertex (..)
+  -- * Types
+  , Time , Variable (..) , Factor (..) , Node 
   , Edge , EdgeType (..)
+  , Team
+  -- * Constructors for nodes
+  , mkVertex , mkReward , mkNonReward , mkDynamics , mkControl
+  -- * Constructor for edges
   , (.$.) , (.|.)
-  , Team , mkTeam , mkTeamTime , mkTeamTimeBy
+  -- * Constructors for teams
+  , mkTeam , mkTeamTime , mkTeamTimeBy
+  -- * Select specific nodes
   , selNodes , variables, rewards, factors, controls
+  -- * Graph elements
   , parents , children , ancestors , ancestoral , descendants 
   , futureNodes , pastNodes
+  -- * Display functions
   , printTeam , showTeam , graphToDot , printGraph
+  -- * Utility functions for "Data.Graph.Inductive"
   , label, labels
   ) where
 
@@ -43,29 +57,32 @@ import Text.Printf (printf)
 type Time = Int
 
 -- | Variable nodes
-data Variable = Reward      String
-              | NonReward   String
+data Variable = Reward      String  -- ^ Reward variable node
+              | NonReward   String  -- ^ Non reard variable node
                deriving (Eq, Ord, Show)
 
 -- | Factor Vertexs
-data Factor   = Dynamics    String
-              | Control     String
+data Factor   = Dynamics    String -- ^ Factor node representing system dynamics
+              | Control     String -- ^ Factor node representing control function
                 deriving (Eq, Ord, Show)
 
--- | Create a sequence of nodes
+-- | Create a sequence of nodes of a specific type
 mkVertex ::  (String -> a) -> String -> Time -> a
 mkVertex t s = t . (s ++ ) . show
 
--- | Create a sequence of nodes of a specific type
+-- | Create a sequence of reward nodes
 mkReward ::  String -> Time -> Variable
 mkReward    = mkVertex Reward 
 
+-- | Create a sequence of non reward nodes
 mkNonReward ::  String -> Time -> Variable
 mkNonReward = mkVertex NonReward
 
+-- | Create a sequence of system dynamics nodes
 mkDynamics ::  String -> Time -> Factor
 mkDynamics  = mkVertex Dynamics
 
+-- | Create a sequence of control nodes
 mkControl ::  String -> Time -> Factor
 mkControl   = mkVertex Control
 
@@ -74,14 +91,23 @@ type Node = Either Factor Variable
 
 -- | A type class for defining operations on all nodes
 class Vertex a where
+  -- | Name of node @a@
   name        ::  a  -> String
+  -- | Name of a list of nodes
   names       :: [a] -> String
+  -- | Check if node @a@ is a reward node
   isReward    ::  a  -> Bool
+  -- | Check if node @a@ is a non reward node
   isNonReward ::  a  -> Bool
+  -- | Check if node @a@ is a variable node
   isVariable  ::  a  -> Bool
+  -- | Check if node @a@ is a system dynamics
   isDynamics  ::  a  -> Bool
+  -- | Check if node @a@ is a control node
   isControl   ::  a  -> Bool
+  -- | Check if node @a@ is a factor node
   isFactor    ::  a  -> Bool
+  -- | The attributes of the node. Used to contruct the dot file.
   attribute   ::  a  -> [G.Attribute]
   -- Default implmentation
   names xs     = "[" ++ intercalate ", " (map name xs) ++ "]"
@@ -147,12 +173,19 @@ data EdgeType = Influence | Belief deriving (Eq, Ord, Show)
 edgeAttribute :: EdgeType -> [G.Attribute]
 edgeAttribute _ = []
 
--- | Infix operators for ease of constructing a graph
+-- | Used with @(.|.)@ to specify relation between the nodes. For example, if
+-- @x@ is a function of @y@ and @z@, we can write
+-- 
+-- @f.$.(x.|.[y,z])@.
 
 (.$.) ::  Factor -> (Variable, [Variable]) -> [Edge]
 (.$.) f (x,ys) = (Left f, Right x, Influence) 
                 : map (\y -> (Right y, Left f, Influence)) ys
 
+-- | Used with @(.$.)@ to specify relation between the nodes. For example, if
+-- @x@ is a function of @y@ and @z@, we can write
+--
+-- @f.$.(x.|.[y,z])@.
 (.|.) ::  Variable -> [Variable] -> (Variable, [Variable])
 (.|.) x ys = (x,ys)
 
@@ -162,55 +195,60 @@ infixr 6 .$.
 -- | A sequential team as a directed acyclic factor graph (DAFG)
 type Team = G.Gr Node EdgeType
 
--- | A utility function for creating a DAFG
+-- | Construct a DAFG from a set of edges. For example, 
+--
+-- @
+-- f = 'Control' \"f\"
+-- x = 'Reward'  \"x\"
+-- y = 'NonReward' \"y\"
+-- z = 'NonReward' \"z\"
+-- g = mkTeam $ f.$.(x.|.[y,z])
+-- @
+--
 mkTeam :: [Edge] -> Team
 mkTeam es = G.mkGraph nodes edges where
   (nodes,nodeMap) = G.mkNodes G.new . nub . concatMap (\(a,b,_) -> [a,b]) $ es
   edges           = fromJust . G.mkEdges nodeMap $ es 
 
--- | To make a time homogeneous system
-mkTeamTime :: (Time -> [Edge]) -> Time -> Team
-mkTeamTime dyn = mkTeamTimeBy [] dyn (const [])
+{- |To make a time homogeneous system. As an example, an MDP can be created as
+follows
 
--- As an example, an MDP can be created as follows
+@
+x = 'mkNonReward' \"x\"
+u = 'mkNonReward' \"u\"
+r = 'mkReward'    \"r\"
 
-{-
-x = mkNonReward "x"
-u = mkNonReward "u"
-r = mkReward    "r"
-
-f = mkDynamics  "f"
-g = mkControl   "g"
-d = mkDynamics  "d"
+f = 'mkDynamics'  \"f\"
+g = 'mkControl'   \"g\"
+d = 'mkDynamics'  \"d\"
 
 dynamics t =  f(t-1).$.( x(t) .|. if t == 1 then [] else [x(t-1), u(t-1)] )
           ++  g(t)  .$.( u(t) .|. map x[1..t] ++ map u[1..t-1]    )
           ++  d(t)  .$.( r(t) .|. [ x(t), u(t) ]                  )
 
-mdp = mkTeamTime dynamics 3
+mdp = 'mkTeamTime' dynamics 3
+@
 -}
+mkTeamTime :: (Time -> [Edge]) -> Time -> Team
+mkTeamTime dyn = mkTeamTimeBy [] dyn (const [])
     
--- | To make a time homogeneous system with specific start and stop dynamics
-mkTeamTimeBy :: [Edge] -> (Time -> [Edge]) -> (Time -> [Edge]) -> Time -> Team
-mkTeamTimeBy start dyn stop horizon = mkTeam nodes where
-  nodes = start ++ concatMap dyn [1..horizon] ++ stop horizon
+{-  To make a time homogeneous system with specific start and stop dynamics
+As an example, a communication system with feedback can be created as
+follows.
 
--- As an example, a communication system with feedback can be created as
--- follows.
+@
+m     = 'NonReward' \"m\"
+mhat  = 'NonReward' \"mhat\"
+r     = 'Reward'    \"r\"
+h     = 'Dynamics'  \"h\"
+g     = 'Control'   \"g\"
+d     = 'Dynamics'  \"d\"
 
-{-
-m     = NonReward "m"
-mhat  = NonReward "mhat"
-r     = Reward    "r"
-h     = Dynamics  "h"
-g     = Control   "g"
-d     = Dynamics  "d"
+x = 'mkNonReward' \"x\"
+y = 'mkNonReward' \"y\"
 
-x = mkNonReward "x"
-y = mkNonReward "y"
-
-f = mkControl  "f"
-c = mkDynamics "c"
+f = 'mkControl'  \"f\"
+c = 'mkDynamics' \"c\"
 
 start      = h .$.( m .|. [] )
 dynamics t = f(t) .$. ( x(t) .|. m : map x [1..t-1] ++ map y [1..t-1] )
@@ -218,26 +256,36 @@ dynamics t = f(t) .$. ( x(t) .|. m : map x [1..t-1] ++ map y [1..t-1] )
 stop t     = g .$. ( mhat .|. map y [1..t] )
           ++ d .$. (r .|. [m, mhat] )
 
-commfb = mkTeamTimeBy start dynamics stop 3
+commfb = 'mkTeamTimeBy' start dynamics stop 3
 -}
+
+mkTeamTimeBy :: [Edge] -> (Time -> [Edge]) -> (Time -> [Edge]) -> Time -> Team
+mkTeamTimeBy start dyn stop horizon = mkTeam nodes where
+  nodes = start ++ concatMap dyn [1..horizon] ++ stop horizon
+
 
 -- * Utility functions
 
 -- filterNodes :: (Node -> Bool) -> Team -> [G.Node] -> [G.Node]
 -- filterNodes p team = filter (p . label team) 
 
+-- | Select nodes whose label satisfy a particular predicate
 selNodes :: G.Graph gr => (a -> Bool) -> gr a b -> [G.Node]
 selNodes p = map G.node' . G.gsel (p.G.lab') 
 
+-- | All variable nods
 variables :: Team -> [G.Node]
 variables = selNodes isVariable
 
+-- | All reward nodes
 rewards   ::  Team -> [G.Node]
 rewards   = selNodes isReward
 
+-- | All control factors
 controls  ::  Team -> [G.Node] 
 controls  = selNodes isControl
 
+-- | All factors
 factors   ::  Team -> [G.Node]
 factors   = selNodes isFactor
 
@@ -274,9 +322,11 @@ pastNodes team p = filter (p . label team) . ancestors team
 
 -- * Display functions
 
+-- | Pretty print the team specification
 printTeam :: Team -> IO ()
 printTeam = putStr . showTeam
 
+-- | Pretty print the team specification
 showTeam :: Team -> String
 showTeam team = showTeamBy team isDynamics "Dynamics:" ++ "\n"
              ++ showTeamBy team isControl  "Control :" ++ "\n"
@@ -296,18 +346,21 @@ showTeamBy team p str = if null equations
 
 -- * Convert to Graphviz graphs
 
+-- | Convert the graph to a dot file
 graphToDot :: Team -> G.DotGraph
 graphToDot team = G.graphToDot team [] (attribute.snd) 
              (edgeAttribute. \(_,_,b) -> b)
 
--- | Print the dot file
+-- | Convert the dot file to a pdf
 printGraph ::  Team -> FilePath -> IO Bool
 printGraph team = G.runGraphviz (graphToDot team) G.Pdf 
 
 -- | Extensions of Data.Graph.Inductive
 
+-- | Label of a particular node
 label ::  G.Graph gr => gr a b -> G.Node -> a
 label gr = fromJust . G.lab gr
 
+-- | Labels of a list of nodes
 labels :: G.Graph gr => gr a b -> [G.Node] -> [a]
 labels = map . label 
