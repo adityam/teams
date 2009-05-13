@@ -1,5 +1,5 @@
 Name:                teams
-Version:             0.0.1
+Version:             0.0.2
 Description:         Graphical modeling tools for sequential teams
 License:             GPL
 License-file:        LICENSE
@@ -16,4 +16,5 @@ Library
                       Data.Teams.Structure
                       Data.Teams.Examples.Wit79
                       Data.Teams.Examples.DecMdp
+                      Data.Teams.Examples.MAB
    ghc-options:       -Wall

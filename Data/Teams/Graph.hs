@@ -31,7 +31,8 @@ module Data.Teams.Graph
   , Edge , EdgeType (..)
   , Team
   -- * Constructors for nodes
-  , mkVertex , mkReward , mkNonReward , mkDynamics , mkControl
+  , mkVertex , mkReward , mkNonReward , mkControl
+  , mkDeterministic, mkStochastic
   -- * Constructor for edges
   , (.$.) , (.|.)
   -- * Constructors for teams
@@ -62,8 +63,9 @@ data Variable = Reward      String  -- ^ Reward variable node
                deriving (Eq, Ord, Show)
 
 -- | Factor Vertexs
-data Factor   = Dynamics    String -- ^ Factor node representing system dynamics
-              | Control     String -- ^ Factor node representing control function
+data Factor   = Deterministic String -- ^ Factor node representing deterministic system dynamics
+              | Stochastic    String -- ^ Factor node representing stochastic system dynamics
+              | Control       String -- ^ Factor node representing control function
                 deriving (Eq, Ord, Show)
 
 -- | Create a sequence of nodes of a specific type
@@ -78,9 +80,13 @@ mkReward    = mkVertex Reward
 mkNonReward ::  String -> Time -> Variable
 mkNonReward = mkVertex NonReward
 
--- | Create a sequence of system dynamics nodes
-mkDynamics ::  String -> Time -> Factor
-mkDynamics  = mkVertex Dynamics
+-- | Create a sequence of stochastic system dynamics nodes
+mkStochastic ::  String -> Time -> Factor
+mkStochastic  = mkVertex Stochastic
+
+-- | Create a sequence of deterministic system dynamics nodes
+mkDeterministic ::  String -> Time -> Factor
+mkDeterministic  = mkVertex Deterministic
 
 -- | Create a sequence of control nodes
 mkControl ::  String -> Time -> Factor
@@ -92,27 +98,29 @@ type Node = Either Factor Variable
 -- | A type class for defining operations on all nodes
 class Vertex a where
   -- | Name of node @a@
-  name        ::  a  -> String
+  name            ::  a  -> String
   -- | Name of a list of nodes
-  names       :: [a] -> String
+  names           :: [a] -> String
   -- | Check if node @a@ is a reward node
-  isReward    ::  a  -> Bool
+  isReward        ::  a  -> Bool
   -- | Check if node @a@ is a non reward node
-  isNonReward ::  a  -> Bool
+  isNonReward     ::  a  -> Bool
   -- | Check if node @a@ is a variable node
-  isVariable  ::  a  -> Bool
-  -- | Check if node @a@ is a system dynamics
-  isDynamics  ::  a  -> Bool
+  isVariable      ::  a  -> Bool
+  -- | Check if node @a@ is a stochastic system dynamics
+  isStochastic    ::  a  -> Bool
+  -- | Check if node @a@ is a deterministic stochastic system dynamics
+  isDeterministic ::  a  -> Bool
   -- | Check if node @a@ is a control node
-  isControl   ::  a  -> Bool
+  isControl       ::  a  -> Bool
   -- | Check if node @a@ is a factor node
-  isFactor    ::  a  -> Bool
+  isFactor        ::  a  -> Bool
   -- | The attributes of the node. Used to contruct the dot file.
-  attribute   ::  a  -> [G.Attribute]
+  attribute       ::  a  -> [G.Attribute]
   -- Default implmentation
   names xs     = "[" ++ intercalate ", " (map name xs) ++ "]"
   isVariable   = or . sequence [isReward, isNonReward]
-  isFactor     = or . sequence [isControl, isDynamics]
+  isFactor     = or . sequence [isControl, isDeterministic, isStochastic]
 
 
 instance Vertex Variable where
@@ -125,8 +133,9 @@ instance Vertex Variable where
   isNonReward (Reward    _) = False
   isNonReward (NonReward _) = True
 
-  isDynamics  _   = False
-  isControl   _   = False
+  isDeterministic _   = False
+  isStochastic    _   = False
+  isControl       _   = False
 
   attribute (Reward    a) = [G.Style G.Filled, G.FillColor (G.RGB 0 255 0)
                             , G.Shape G.Circle
@@ -135,31 +144,42 @@ instance Vertex Variable where
                             , G.Label a]
 
 instance Vertex Factor where
-  name (Dynamics a) = a
-  name (Control  a) = a
+  name (Deterministic a) = a
+  name (Stochastic    a) = a
+  name (Control       a) = a
 
-  isDynamics (Dynamics _) = True
-  isDynamics (Control  _) = False
+  isDeterministic (Deterministic _) = True
+  isDeterministic (Stochastic    _) = False
+  isDeterministic (Control       _) = False
 
-  isControl  (Dynamics _) = False
-  isControl  (Control  _) = True
+  isStochastic (Deterministic _) = False
+  isStochastic (Stochastic    _) = True
+  isStochastic (Control       _) = False
+
+  isControl (Deterministic _) = False
+  isControl (Stochastic    _) = False
+  isControl (Control       _) = True
 
   isReward    _ = False
   isNonReward _ = False
 
-  attribute (Dynamics a) = [G.Shape G.Rectangle
-                           , G.Label a]
-  attribute (Control  a) = [G.Style G.Filled, G.FillColor (G.RGB 255 0 0)
-                           , G.Shape G.Rectangle
-                           , G.Label a]
+  attribute (Deterministic a) = [G.Shape G.Rectangle
+                                , G.Label a]
+  attribute (Stochastic    a) = [G.Style G.Filled, G.FillColor (G.RGB 100 0 0)
+                                , G.Shape G.Rectangle
+                                , G.Label a]
+  attribute (Control       a) = [G.Style G.Filled, G.FillColor (G.RGB 255 0 0)
+                                , G.Shape G.Rectangle
+                                , G.Label a]
 
 instance (Vertex a, Vertex b) => Vertex (Either a b) where
-  name        = either name        name
-  isReward    = either isReward    isReward
-  isNonReward = either isNonReward isNonReward
-  isDynamics  = either isDynamics  isDynamics 
-  isControl   = either isControl   isControl
-  attribute   = either attribute   attribute
+  name            = either name        name
+  isReward        = either isReward    isReward
+  isNonReward     = either isNonReward isNonReward
+  isDeterministic = either isDeterministic  isDeterministic
+  isStochastic    = either isStochastic  isStochastic
+  isControl       = either isControl   isControl
+  attribute       = either attribute   attribute
 
 -- | An edge in a graph
 type Edge     = (Node, Node, EdgeType)
@@ -218,9 +238,9 @@ x = 'mkNonReward' \"x\"
 u = 'mkNonReward' \"u\"
 r = 'mkReward'    \"r\"
 
-f = 'mkDynamics'  \"f\"
-g = 'mkControl'   \"g\"
-d = 'mkDynamics'  \"d\"
+f = 'mkStochastic'  \"f\"
+g = 'mkControl'     \"g\"
+d = 'mkStochastic'  \"d\"
 
 dynamics t =  f(t-1).$.( x(t) .|. if t == 1 then [] else [x(t-1), u(t-1)] )
           ++  g(t)  .$.( u(t) .|. map x[1..t] ++ map u[1..t-1]    )
@@ -237,18 +257,18 @@ As an example, a communication system with feedback can be created as
 follows.
 
 @
-m     = 'NonReward' \"m\"
-mhat  = 'NonReward' \"mhat\"
-r     = 'Reward'    \"r\"
-h     = 'Dynamics'  \"h\"
-g     = 'Control'   \"g\"
-d     = 'Dynamics'  \"d\"
+m     = 'NonReward'  \"m\"
+mhat  = 'NonReward'  \"mhat\"
+r     = 'Reward'     \"r\"
+h     = 'Stochastic' \"h\"
+g     = 'Control'    \"g\"
+d     = 'Stochastic' \"d\"
 
 x = 'mkNonReward' \"x\"
 y = 'mkNonReward' \"y\"
 
-f = 'mkControl'  \"f\"
-c = 'mkDynamics' \"c\"
+f = 'mkControl'    \"f\"
+c = 'mkStochastic' \"c\"
 
 start      = h .$.( m .|. [] )
 dynamics t = f(t) .$. ( x(t) .|. m : map x [1..t-1] ++ map y [1..t-1] )
@@ -328,8 +348,9 @@ printTeam = putStr . showTeam
 
 -- | Pretty print the team specification
 showTeam :: Team -> String
-showTeam team = showTeamBy team isDynamics "Dynamics:" ++ "\n"
-             ++ showTeamBy team isControl  "Control :" ++ "\n"
+showTeam team = showTeamBy team isStochastic    "Stochastic:"   ++ "\n"
+             ++ showTeamBy team isDeterministic "Deterministic" ++ "\n"
+             ++ showTeamBy team isControl       "Control :"     ++ "\n"
 
 showTeamBy :: Team -> (Node -> Bool) -> String -> String
 showTeamBy team p str = if null equations 

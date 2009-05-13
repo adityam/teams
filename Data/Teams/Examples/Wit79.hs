@@ -1,7 +1,7 @@
 -- | Real time source coding 
 -- Based on
 --      Hans S. Witsenhausen 
---      "On the structure of real-time source coders,"
+--      \"On the structure of real-time source coders,\"
 --      Bell Systems Technical Journal, 
 --      vol 58, no 6, pp 1437-1451, July-August 1979
 

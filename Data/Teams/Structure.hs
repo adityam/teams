@@ -133,8 +133,9 @@ instance Initializable Variable where
   mkClean v@(NonReward _) = VMarked v NotMarked NotScheduled NotVisited
 
 instance Initializable Factor where
-  mkClean f@(Dynamics _) = FMarked f NotMarked NotScheduled NotVisited
-  mkClean f@(Control  _) = FMarked f NotMarked NotScheduled NotVisited
+  mkClean f@(Deterministic _) = FMarked f NotMarked NotScheduled NotVisited
+  mkClean f@(Stochastic    _) = FMarked f NotMarked NotScheduled NotVisited
+  mkClean f@(Control       _) = FMarked f NotMarked NotScheduled NotVisited
 
 instance (Initializable a, Initializable b) => Initializable (Either a b) where
   mkClean (Left  a) = mkClean a
@@ -195,7 +196,7 @@ doBayesBall condition gr = case scheduledNodes gr of
              bottomVisit   | x `elem` condition   = id
                            | otherwise            = checkAction . markBottom
              -- Check if a node is a deterministic node or not. 
-             checkAction   | isDeterministic gr x = id
+             checkAction   | isFunctional    gr x = id
                            | otherwise            = markTop
              -- When the visit is from the top, is the node is in the
              -- conditioning node and its bottom is not marked, mark its bottom
@@ -231,12 +232,12 @@ doBayesBall condition gr = case scheduledNodes gr of
              markVisited{- g -} = visitNode  x -- g 
              markClean  {- g -} = cleanNode  x -- g 
 
--- | Check if a node is deterministic. Currently we simply check if its parent
--- is a control node.
-isDeterministic :: MTeam -> G.Node -> Bool
-isDeterministic mteam x = case G.pre mteam x of 
+-- | Check if a node is functionally deterministic. We check if its parent
+-- is a control node or a deterministic
+isFunctional :: MTeam -> G.Node -> Bool
+isFunctional mteam x = case G.pre mteam x of 
   []  -> True
-  [y] -> isControl. node . label mteam $ y
+  [y] -> or . sequence [isControl, isDeterministic] . node . label mteam $ y
   _   -> False
 
 -- | Modify a marked node
