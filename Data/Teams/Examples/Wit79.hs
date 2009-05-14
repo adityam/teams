@@ -15,11 +15,11 @@ y  = mkNonReward "y"
 m  = mkNonReward "m"
 r  = mkReward    "r"
 
-f = mkDynamics "f"
-c = mkControl  "c"
-g = mkControl  "g"
-l = mkControl  "l"
-d = mkDynamics "d"
+f = mkStochastic "f"
+c = mkControl    "c"
+g = mkControl    "g"
+l = mkControl    "l"
+d = mkStochastic "d"
 
 dynamics t | t == 1 = f(1).$.(x(1) .|. [])
                    ++ c(1).$.(y(1) .|. [x(1)])

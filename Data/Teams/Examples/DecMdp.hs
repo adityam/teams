@@ -9,10 +9,10 @@ u1 = mkNonReward "u1"
 u2 = mkNonReward "u2"
 r  = mkReward    "r"
 
-f  = mkDynamics "f"
-g1 = mkControl  "g1"
-g2 = mkControl  "g2"
-d  = mkDynamics "d"
+f  = mkStochastic "f"
+g1 = mkControl    "g1"
+g2 = mkControl    "g2"
+d  = mkStochastic "d"
 
 dynamics t = f(t).$.(x(t) .|. if t == 1 then [] else [x(t-1), u1(t-1), u2(t-1)])
           ++ g1(t).$.(u1(t) .|. map x[1..t] ++ map u1[1..t-1])
