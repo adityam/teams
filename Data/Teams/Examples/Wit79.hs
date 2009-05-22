@@ -32,7 +32,5 @@ dynamics t | t == 1 = f(1).$.(x(1) .|. [])
                       ++ l(t).$.(m(t) .|. [y(t), m(t-1)])
                       ++ d(t).$.(r(t) .|. [x(t), x'(t)])
 
-rt = mkTeamTime dynamics 4
-
-rt' = simplify rt
+rt = mkTeamTime dynamics 3
 

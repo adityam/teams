@@ -155,9 +155,8 @@ bayesBall team condition reward = doBayesBall condition mteam where
   -- Then schedule all reward nodes to be visited from bottom.
   mteam = G.gmap initialize . G.nmap mkClean $ team
   initialize (pre,idx,lab,suc) = (pre, idx, lab', suc) 
-      where lab' = if idx `elem` reward 
-                   then addSchedule BottomScheduled lab 
-                   else lab
+      where lab' | idx `elem` reward = addSchedule BottomScheduled lab 
+                 | otherwise         = lab
 
 -- | The main loop of the Bayes Ball algorithm
 doBayesBall :: [G.Node] -> MTeam -> MTeam
@@ -294,6 +293,7 @@ determined team var = irrelevant team var (variables team)
 effective :: Team -> [G.Node] -> [G.Node] -> [G.Node]
 effective team conditioned reward = (determined team conditioned `intersect`
                                      ancestoral team reward) \\ conditioned
+-- effective team conditioned reward = determined team conditioned \\ conditioned
 
 -- | The graph restructuring algorithm of the paper.
 simplifyAt ::  Team -> G.Node -> Team
@@ -319,7 +319,8 @@ simplifyOnce team = foldr (flip simplifyAt) team (controls team) where
 simplify :: Team -> Team
 simplify team = untilEqual . zip stream $ [(1::Int)..] where
   stream = iterate simplifyOnce team
-  untilEqual ((a,n):as@((b,_):_)) = trace ("Simplify : Iteration " ++ show n) $
-                               if G.equal a b then a
-                               else untilEqual as
+  untilEqual ((a,n):as@((b,_):_)) 
+      | G.equal a b = a
+      | otherwise   = trace ("Simplify : Iteration " ++ show n) 
+                            (untilEqual as)
   untilEqual _ = error "Infinite stream ended. This should not happen"

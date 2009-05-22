@@ -27,15 +27,15 @@ c1 = mkDeterministic  "c1"
 c2 = mkDeterministic  "c2"
 d  = mkStochastic     "d"
 
-dynamics t = f1(t).$.(x1(t).|. if t==1 then [] else [x1(t-1), u1(t-1), z2(t-1)])
-          ++ f2(t).$.(x2(t).|. if t==1 then [] else [x2(t-1), u2(t-1), z1(t-1)])
+dynamics t = f1(t).$.(x1(t).|. onlyif (t /= 1) [x1(t-1), u1(t-1), z2(t-1)])
+          ++ f2(t).$.(x2(t).|. onlyif (t /= 1) [x2(t-1), u2(t-1), z1(t-1)])
           ++ g1(t).$.(u1(t).|. map x1[1..t]   ++ map u1[1..t-1] 
                             ++ map z2[1..t-1])
           ++ g2(t).$.(u2(t).|. map x2[1..t]   ++ map u2[1..t-1] 
                             ++ map z1[1..t-1])
           ++ c1(t).$.(z1(t).|. [x1(t), u1(t)])
           ++ c2(t).$.(z2(t).|. [x2(t), u2(t)])
-          ++ d(t).$.(r(t) .|. [x1(t), x2(t), u1(t), u2(t)])
+          ++ d(t) .$.(r(t) .|. [x1(t), x2(t), u1(t), u2(t)])
 
 mab = mkTeamTime dynamics 4
 

@@ -46,6 +46,8 @@ module Data.Teams.Graph
   , printTeam , showTeam , graphToDot , printGraph
   -- * Utility functions for "Data.Graph.Inductive"
   , label, labels
+  -- * Utility functions for "Control.Monad"
+  , onlyif
   ) where
 
 import qualified Data.Graph.Inductive as G
@@ -53,6 +55,7 @@ import qualified Data.GraphViz  as G
 import Data.Maybe (fromJust)
 import Data.List (nub, intercalate, delete)
 import Text.Printf (printf)
+import Control.Monad (MonadPlus, mzero)
 
 -- | Time
 type Time = Int
@@ -165,7 +168,7 @@ instance Vertex Factor where
 
   attribute (Deterministic a) = [G.Shape G.Rectangle
                                 , G.Label a]
-  attribute (Stochastic    a) = [G.Style G.Filled, G.FillColor (G.RGB 100 0 0)
+  attribute (Stochastic    a) = [G.Style G.Filled, G.FillColor (G.RGB 100 255 255)
                                 , G.Shape G.Rectangle
                                 , G.Label a]
   attribute (Control       a) = [G.Style G.Filled, G.FillColor (G.RGB 255 0 0)
@@ -211,6 +214,9 @@ edgeAttribute _ = []
 
 infixr 4 .|.
 infixr 6 .$.
+
+onlyif :: MonadPlus m => Bool -> m a -> m a
+onlyif p a = if p then a else mzero
 
 -- | A sequential team as a directed acyclic factor graph (DAFG)
 type Team = G.Gr Node EdgeType
