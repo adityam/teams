@@ -3,7 +3,6 @@
 
 module Data.Teams.Examples.DecMdp where
 import Data.Teams.Structure 
-import Control.Monad (guard)
 
 x  = mkNonReward "x"
 u1 = mkNonReward "u1"
