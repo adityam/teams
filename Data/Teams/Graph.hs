@@ -140,11 +140,11 @@ instance Vertex Variable where
   isStochastic    _   = False
   isControl       _   = False
 
-  attribute (Reward    a) = [G.Style G.Filled, G.FillColor (G.RGB 0 255 0)
+  attribute (Reward    a) = [G.Style [G.SItem G.Filled []], G.FillColor (G.RGB 255 204 255)
                             , G.Shape G.Circle
-                            , G.Label a]
+                            , G.Label (G.StrLabel a)]
   attribute (NonReward a) = [G.Shape G.Circle
-                            , G.Label a]
+                            , G.Label (G.StrLabel a)]
 
 instance Vertex Factor where
   name (Deterministic a) = a
@@ -167,13 +167,13 @@ instance Vertex Factor where
   isNonReward _ = False
 
   attribute (Deterministic a) = [G.Shape G.Rectangle
-                                , G.Label a]
-  attribute (Stochastic    a) = [G.Style G.Filled, G.FillColor (G.RGB 100 255 255)
+                                , G.Label (G.StrLabel a)]
+  attribute (Stochastic    a) = [-- G.Style [G.SItem G.Filled []], G.FillColor (G.RGB 100 255 255)
+                                {-,-} G.Shape G.Rectangle
+                                , G.Label (G.StrLabel a)]
+  attribute (Control       a) = [G.Style [G.SItem G.Filled []], G.FillColor (G.RGB 204 255 255)
                                 , G.Shape G.Rectangle
-                                , G.Label a]
-  attribute (Control       a) = [G.Style G.Filled, G.FillColor (G.RGB 255 0 0)
-                                , G.Shape G.Rectangle
-                                , G.Label a]
+                                , G.Label (G.StrLabel a)]
 
 instance (Vertex a, Vertex b) => Vertex (Either a b) where
   name            = either name        name
@@ -374,8 +374,8 @@ showTeamBy team p str = if null equations
 -- * Convert to Graphviz graphs
 
 -- | Convert the graph to a dot file
-graphToDot :: Team -> G.DotGraph
-graphToDot team = G.graphToDot team [] (attribute.snd) 
+graphToDot :: Team -> G.DotGraph G.Node
+graphToDot team = G.graphToDot True team [] (attribute.snd) 
              (edgeAttribute. \(_,_,b) -> b)
 
 -- | Convert the dot file to a pdf
